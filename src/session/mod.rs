@@ -7,7 +7,7 @@ use crate::{
 
 pub struct SnowflakeSession {
     pub(super) http: reqwest::Client,
-    pub(super) account: String,
+    pub(super) base_url: String,
     pub(super) session_token: String,
     pub(super) timeout: Option<Duration>,
 }

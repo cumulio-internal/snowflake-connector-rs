@@ -3,13 +3,13 @@
 //! A Rust client for Snowflake, which enables you to connect to Snowflake and run queries.
 //!
 //! ```rust
-//! # use snowflake_connector_rs::{Result, SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
+//! # use snowflake_connector_rs::{Result, SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig, AccountLocator};
 //! # async fn run() -> Result<()> {
 //! let client = SnowflakeClient::new(
 //!     "USERNAME",
 //!     SnowflakeAuthMethod::Password("PASSWORD".to_string()),
 //!     SnowflakeClientConfig {
-//!         account: "ACCOUNT".to_string(),
+//!         account: AccountLocator::ShortName("ACCOUNT".to_string()),
 //!         role: Some("ROLE".to_string()),
 //!         warehouse: Some("WAREHOUSE".to_string()),
 //!         database: Some("DATABASE".to_string()),
@@ -42,6 +42,7 @@ mod row;
 mod session;
 
 use std::time::Duration;
+use url::Url;
 
 pub use error::{Error, Result};
 pub use query::QueryExecutor;
@@ -51,6 +52,19 @@ pub use session::SnowflakeSession;
 use auth::login;
 
 use reqwest::{Client, ClientBuilder, Proxy};
+
+//
+#[derive(Debug, Clone)]
+pub enum AccountLocator {
+    ShortName(String), // e.g., "TO12345.eu-west-1"
+    FullUrl(Url),      // e.g., "https://TO12345.eu-west-1.gcp.snowflakecomputing.com"
+}
+
+impl Default for AccountLocator {
+    fn default() -> Self {
+        AccountLocator::ShortName("".to_string())
+    }
+}
 
 #[derive(Clone)]
 pub struct SnowflakeClient {
@@ -63,7 +77,7 @@ pub struct SnowflakeClient {
 
 #[derive(Default, Clone)]
 pub struct SnowflakeClientConfig {
-    pub account: String,
+    pub account: AccountLocator,
 
     pub warehouse: Option<String>,
     pub database: Option<String>,
@@ -114,11 +128,12 @@ impl SnowflakeClient {
     }
 
     pub async fn create_session(&self) -> Result<SnowflakeSession> {
-        let session_token = login(&self.http, &self.username, &self.auth, &self.config).await?;
+        let login_response = login(&self.http, &self.username, &self.auth, &self.config).await?;
         Ok(SnowflakeSession {
             http: self.http.clone(),
-            account: self.config.account.clone(),
-            session_token,
+            base_url: login_response.base_url,
+            // account: login_response.account,
+            session_token: login_response.token,
             timeout: self.config.timeout,
         })
     }

@@ -1,4 +1,6 @@
-use snowflake_connector_rs::{Result, SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
+use snowflake_connector_rs::{
+    AccountLocator, Result, SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig,
+};
 
 pub fn connect() -> Result<SnowflakeClient> {
     let username = std::env::var("SNOWFLAKE_USERNAME").expect("set SNOWFLAKE_USERNAME for testing");
@@ -14,7 +16,7 @@ pub fn connect() -> Result<SnowflakeClient> {
         &username,
         SnowflakeAuthMethod::Password(password),
         SnowflakeClientConfig {
-            account,
+            account: AccountLocator::ShortName(account),
             warehouse,
             database,
             schema,
