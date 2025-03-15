@@ -49,7 +49,6 @@ pub(super) async fn login(
         }
     };
 
-    println!("base_url: {}, account: {}", base_url, account);
     let login_url = format!("{base_url}/session/v1/login-request");
 
     let mut queries = vec![];
@@ -93,7 +92,6 @@ pub(super) async fn login(
 }
 
 fn login_request_data(username: &str, auth: &SnowflakeAuthMethod, account: &str) -> Result<Value> {
-    println!("username: {}, account: {}", username, account);
     match auth {
         SnowflakeAuthMethod::Password(password) => Ok(json!({
             "LOGIN_NAME": username,

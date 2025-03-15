@@ -132,7 +132,6 @@ impl SnowflakeClient {
         Ok(SnowflakeSession {
             http: self.http.clone(),
             base_url: login_response.base_url,
-            // account: login_response.account,
             session_token: login_response.token,
             timeout: self.config.timeout,
         })
