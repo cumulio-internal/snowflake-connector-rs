@@ -42,7 +42,7 @@ mod row;
 mod session;
 
 use std::time::Duration;
-use url::Url;
+pub use url::Url;
 
 pub use error::{Error, Result};
 pub use query::QueryExecutor;
