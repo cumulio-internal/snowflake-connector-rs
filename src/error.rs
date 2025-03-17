@@ -58,6 +58,9 @@ pub enum Error {
 
     #[error("timed out waiting for query results")]
     TimedOut,
+
+    #[error("Error parsing account URL: {0}")]
+    AccountUrlParseError(String),
 }
 
 /// A `Result` alias where the `Err` case is `snowflake::Error`.

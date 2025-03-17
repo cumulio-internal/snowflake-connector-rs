@@ -6,21 +6,50 @@ use reqwest::Client;
 use rsa::RsaPrivateKey;
 use serde_json::{json, Value};
 
-use crate::{Error, Result, SnowflakeAuthMethod, SnowflakeClientConfig};
+use crate::{AccountLocator, Error, Result, SnowflakeAuthMethod, SnowflakeClientConfig};
 
 use self::key_pair::generate_jwt_from_key_pair;
 
-/// Login to Snowflake and return a session token.
+pub struct InternalLoginResponse {
+    pub token: String,
+    pub base_url: String,
+}
+
+/// Login to Snowflake and return a session token and base URL.
 pub(super) async fn login(
     http: &Client,
     username: &str,
     auth: &SnowflakeAuthMethod,
     config: &SnowflakeClientConfig,
-) -> Result<String> {
-    let url = format!(
-        "https://{account}.snowflakecomputing.com/session/v1/login-request",
-        account = config.account
-    );
+) -> Result<InternalLoginResponse> {
+    let (base_url, account) = match &config.account {
+        AccountLocator::ShortName(account) => (
+            format!("https://{account}.snowflakecomputing.com"),
+            account.clone(),
+        ),
+        AccountLocator::FullUrl(url) => {
+            let host = url.host_str().ok_or(Error::AccountUrlParseError(
+                "No host found in URL".to_string(),
+            ))?;
+
+            // This is only the first part of the account
+            let account = host
+                .split('.')
+                .next()
+                .ok_or(Error::AccountUrlParseError(
+                    "Could not extract account name from URL".to_string(),
+                ))?
+                .to_string();
+
+            let mut base_url = url.to_string();
+            if base_url.ends_with('/') {
+                base_url.pop(); // Remove the trailing slash if any
+            }
+            (base_url, account)
+        }
+    };
+
+    let login_url = format!("{base_url}/session/v1/login-request");
 
     let mut queries = vec![];
     if let Some(warehouse) = &config.warehouse {
@@ -36,9 +65,9 @@ pub(super) async fn login(
         queries.push(("roleName", role));
     }
 
-    let login_data = login_request_data(username, auth, config)?;
+    let login_data = login_request_data(username, auth, &account)?;
     let response = http
-        .post(url)
+        .post(login_url)
         .query(&queries)
         .json(&json!({
             "data": login_data
@@ -56,19 +85,18 @@ pub(super) async fn login(
         return Err(Error::Communication(response.message.unwrap_or_default()));
     }
 
-    Ok(response.data.token)
+    Ok(InternalLoginResponse {
+        token: response.data.token,
+        base_url,
+    })
 }
 
-fn login_request_data(
-    username: &str,
-    auth: &SnowflakeAuthMethod,
-    config: &SnowflakeClientConfig,
-) -> Result<Value> {
+fn login_request_data(username: &str, auth: &SnowflakeAuthMethod, account: &str) -> Result<Value> {
     match auth {
         SnowflakeAuthMethod::Password(password) => Ok(json!({
             "LOGIN_NAME": username,
             "PASSWORD": password,
-            "ACCOUNT_NAME": config.account
+            "ACCOUNT_NAME": account
         })),
         SnowflakeAuthMethod::KeyPair {
             encrypted_pem,
@@ -79,15 +107,11 @@ fn login_request_data(
                 _ => RsaPrivateKey::from_pkcs8_encrypted_pem(encrypted_pem, password)?,
             };
 
-            let jwt = generate_jwt_from_key_pair(
-                private_key,
-                username,
-                &config.account,
-                Utc::now().timestamp(),
-            )?;
+            let jwt =
+                generate_jwt_from_key_pair(private_key, username, account, Utc::now().timestamp())?;
             Ok(json!({
                 "LOGIN_NAME": username,
-                "ACCOUNT_NAME": config.account,
+                "ACCOUNT_NAME": account,
                 "TOKEN": jwt,
                 "AUTHENTICATOR": "SNOWFLAKE_JWT"
             }))

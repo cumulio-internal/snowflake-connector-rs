@@ -38,16 +38,14 @@ impl QueryExecutor {
     ) -> Result<Self> {
         let SnowflakeSession {
             http,
-            account,
+            base_url,
             session_token,
             timeout,
         } = sess;
         let timeout = timeout.unwrap_or(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS));
 
         let request_id = uuid::Uuid::new_v4();
-        let url = format!(
-            r"https://{account}.snowflakecomputing.com/queries/v1/query-request?requestId={request_id}"
-        );
+        let url = format!(r"{base_url}/queries/v1/query-request?requestId={request_id}");
 
         let request: QueryRequest = request.into();
         let response = http
@@ -77,7 +75,7 @@ impl QueryExecutor {
             match response.data.get_result_url {
                 Some(result_url) => {
                     response =
-                        poll_for_async_results(http, account, &result_url, session_token, timeout)
+                        poll_for_async_results(http, &base_url, &result_url, session_token, timeout)
                             .await?
                 }
                 None => {
@@ -283,7 +281,7 @@ impl QueryExecutor {
 
 async fn poll_for_async_results(
     http: &Client,
-    account: &str,
+    base_url: &str,
     result_url: &str,
     session_token: &str,
     timeout: Duration,
@@ -291,7 +289,7 @@ async fn poll_for_async_results(
     let start = Instant::now();
     while start.elapsed() < timeout {
         sleep(Duration::from_secs(10)).await;
-        let url = format!("https://{account}.snowflakecomputing.com{}", result_url);
+        let url = format!("{base_url}{result_url}");
 
         let resp = http
             .get(url)
