@@ -53,11 +53,17 @@ use auth::login;
 
 use reqwest::{Client, ClientBuilder, Proxy};
 
-//
+/// Represents a way to identify a Snowflake account.
+///
+/// This enum provides two different formats for specifying an account:
+/// - `ShortName`: A short identifier, typically including the account name and region.
+/// - `FullUrl`: A complete URL pointing to the account.
 #[derive(Debug, Clone)]
 pub enum AccountLocator {
-    ShortName(String), // e.g., "TO12345.eu-west-1"
-    FullUrl(Url),      // e.g., "https://TO12345.eu-west-1.gcp.snowflakecomputing.com"
+    /// Your Snowflake account (without the .snowflakecomputing.com suffix). This should have the format eg. TO12345.eu-west-1 or TO12345.us-east-2.aws on AWS or TO12345.west-europe.azure on Azure
+    ShortName(String),
+    /// The full account url e.g., "https://TO12345.eu-west-1.gcp.snowflakecomputing.com"
+    FullUrl(Url),
 }
 
 impl Default for AccountLocator {
